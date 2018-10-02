@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8"/>
-        <title>Slim 3</title>
+        <title>PHP - Instagram</title>
         <link href='//fonts.googleapis.com/css?family=Lato:300' rel='stylesheet' type='text/css'>
         <style>
             body {
@@ -26,8 +26,9 @@
         </style>
     </head>
     <body>
-        <h1>Slim</h1>
-        <div>a microframework for PHP</div>
+        <h1>PHP Instagram</h1>
+        <?= $warning ? "<div><i>$warning</i></div>" : '' ?>
+        <?= $error   ? "<div style='color: red;'><i>$error</i></div>" : '' ?>
 
         <?php if (isset($_SESSION['code'])): ?>
             <h3>Access token: <?= $_SESSION['code'] ?></h3>

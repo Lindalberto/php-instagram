@@ -15,6 +15,8 @@ return [
             'path' => isset($_ENV['docker']) ? 'php://stdout' : __DIR__ . '/../logs/app.log',
             'level' => \Monolog\Logger::DEBUG,
         ],
-        'client_id' => getenv('CLIENT_ID')
+        'client_id' => getenv('CLIENT_ID'),
+        'redirect'  => getenv('ADDRESS') ?: 'http://localhost',
+        'client_secret' => getenv('CLIENT_SECRET'),
     ],
 ];

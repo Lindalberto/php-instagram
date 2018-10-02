@@ -11,6 +11,9 @@ class App
 {
     protected $container;
     protected $view;
+    private $clientId;
+    private $clientSecret;
+    private $redirectUri;
 
     /**
      * Rest constructor.
@@ -20,6 +23,10 @@ class App
     {
         $this->container = $container;
         $this->view      = $container->get('renderer');
+
+        $this->clientId     = $this->settings['client_id'];
+        $this->clientSecret = $this->settings['client_secret'];
+        $this->redirectUri  = $this->settings['redirect'];
     }
 
     /**
@@ -85,25 +92,83 @@ class App
 
     public function index(ServerRequestInterface $request, ResponseInterface $response, $args)
     {
-        return $this->view->render($response, 'index.phtml', $args);
+        $warning = false;
+        if (!getenv('CLIENT_ID')) {
+            $warning = 'CLIENT_ID não setado.';
+        }
+        if (!getenv('CLIENT_SECRET')) {
+            $warning .= '<br>CLIENT_SECRET não setado.';
+        }
+        if (!getenv('ADDRESS')) {
+            $warning .= '<br>Seu endereço local realmente é \'<strong>http://localhost</strong>\'? Caso não seja, favor passar um endereço diferente através da variável de ambiente <strong>ADDRESS</strong>';
+        }
+
+        $error = false;
+        if (isset($_SESSION['msg'])) {
+            $error = $_SESSION['msg'];
+            unset($_SESSION['msg']);
+        }
+
+        return $this->view->render($response, 'index.phtml', ['warning' => $warning, 'error' => $error]);
     }
 
     public function request(ServerRequestInterface $request, ResponseInterface $response, $args)
     {
-        $clientId = $this->settings['client_id'];
         return $response
             ->withStatus(302)
             ->withHeader('Location', 
-                'https://api.instagram.com/oauth/authorize/?client_id='. $clientId .'&redirect_uri=http://localhost/response&response_type=code&scope=basic+public_content+comments+relationships+likes+follower_list'
+                'https://api.instagram.com/oauth/authorize/?client_id='. $this->clientId .'&redirect_uri='. $this->redirectUri . '/response&response_type=code&scope=basic+public_content+comments+relationships+likes+follower_list'
             );
     }
 
     public function response(ServerRequestInterface $request, ResponseInterface $response, $args)
     {
+        unset($_SESSION['code']);
+        $code = null;
         if (isset($_GET['code']) && $_GET['code']) {
-            $_SESSION['code'] = $_GET['code'];
+            $code = $_GET['code'];
         }
-        
+
+        if (!$code) {
+            $_SESSION['msg'] = 'Code inválido.';
+            return $response->withStatus(302)->withHeader('Location', '/');
+        }
+
+        $ch = curl_init('https://api.instagram.com/oauth/access_token');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            'client_id'     => $this->clientId,
+            'client_secret' => $this->clientSecret,
+            'grant_type'    => 'authorization_code',
+            'redirect_uri'  => $this->redirectUri .'/response',
+            'code'          => $code
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $return = curl_exec($ch);
+        if (!$return) {
+            $_SESSION['msg'] = 'Houve uma falha na requisição ao instagram.';
+            return $response->withStatus(302)->withHeader('Location', '/');
+        }
+
+        $return = json_decode($return);
+        $_SESSION['code'] = $return->access_token;
+
+        /*
+        var_dump($return);
+        echo "<hr>";
+        var_dump($return->user->id);
+        echo "<br>";
+        var_dump($return->user->username);
+        echo "<br>";
+        var_dump($return->user->profile_picture);
+        echo "<br>";
+        var_dump($return->user->full_name);
+        echo "<br>";
+        var_dump($return->user->bio);
+        echo "<br>";
+        var_dump($return->user->website);
+        echo "<br>";
+        var_dump($return->user->is_business);
+        */
         return $response->withStatus(302)->withHeader('Location', '/');
     }
 
